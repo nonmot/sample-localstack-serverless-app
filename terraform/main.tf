@@ -21,8 +21,11 @@ provider "aws" {
   skip_requesting_account_id  = true
 
   endpoints {
-    sts = "http://localhost:4566"
-    s3  = "http://s3.localhost.localstack.cloud:4566"
+    sts        = "http://localhost:4566"
+    s3         = "http://s3.localhost.localstack.cloud:4566"
+    lambda     = "http://localhost:4566"
+    iam        = "http://localhost:4566"
+    apigateway = "http://localhost:4566"
   }
 }
 
@@ -77,6 +80,8 @@ locals {
       "svg" = "image/svg+xml"
     }, replace(regex("\\.[^.]*$", file), ".", ""), "application/octet-stream")
   }
+
+  lambda_dir = abspath("${path.module}/../lambda")
 }
 
 resource "aws_s3_object" "object_www" {
@@ -95,4 +100,101 @@ resource "aws_s3_object" "object_assets" {
   source       = "${local.dist_dir}/${each.key}"
   content_type = each.value
   acl          = "public-read"
+}
+
+# Lambda
+data "archive_file" "lambda_zip" {
+  type        = "zip"
+  source_file = "${local.lambda_dir}/index.js"
+  output_path = "${path.module}/files/index.zip"
+}
+
+resource "aws_s3_bucket" "lambda_code_bucket" {
+  bucket = "lambda-code-bucket"
+}
+
+resource "aws_s3_object" "lambda_code" {
+  bucket = aws_s3_bucket.lambda_code_bucket.bucket
+  key    = "index.zip"
+  source = data.archive_file.lambda_zip.output_path
+}
+
+resource "aws_lambda_function" "lambda_function" {
+  function_name = "handler"
+  handler       = "index.handler"
+  runtime       = "nodejs20.x"
+  role          = aws_iam_role.lambda_exec.arn
+
+  s3_bucket = aws_s3_bucket.lambda_code_bucket.id
+  s3_key    = aws_s3_object.lambda_code.key
+  source_code_hash = data.archive_file.lambda_zip.output_base64sha256
+}
+
+data "aws_iam_policy_document" "assume_role" {
+  statement {
+    effect = "Allow"
+
+    principals {
+      type        = "Service"
+      identifiers = ["lambda.amazonaws.com"]
+    }
+
+    actions = ["sts:AssumeRole"]
+  }
+}
+
+resource "aws_iam_role" "lambda_exec" {
+  name               = "lambda_exec_role"
+  assume_role_policy = data.aws_iam_policy_document.assume_role.json
+}
+
+
+# APIGateway
+resource "aws_api_gateway_rest_api" "api" {
+  name = "lambda-api"
+  body = jsonencode({
+    openapi = "3.0.1"
+    info = {
+      title   = "api"
+      version = "1.0.0"
+    }
+    paths = {
+      "/health" = {
+        get = {
+          x-amazon-apigateway-integration = {
+            httpMethod           = "POST"
+            payloadFormatVersion = "1.0"
+            type                 = "AWS_PROXY"
+            uri                  = aws_lambda_function.lambda_function.invoke_arn
+          }
+        }
+      }
+    }
+  })
+}
+
+resource "aws_api_gateway_deployment" "deployment" {
+  rest_api_id = aws_api_gateway_rest_api.api.id
+
+  triggers = {
+    redeployment = sha1(jsonencode(aws_api_gateway_rest_api.api.body))
+  }
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+resource "aws_api_gateway_stage" "dev_stage" {
+  deployment_id = aws_api_gateway_deployment.deployment.id
+  rest_api_id   = aws_api_gateway_rest_api.api.id
+  stage_name    = "dev"
+}
+
+resource "aws_lambda_permission" "api_gw" {
+  statement_id  = "AllowAPIGatewayInvoke"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.lambda_function.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.api.execution_arn}/*/*"
 }
