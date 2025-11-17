@@ -1,10 +1,32 @@
-import { useState } from 'react'
 import reactLogo from './assets/react.svg'
 import viteLogo from '/vite.svg'
 import './App.css'
+import { useState, useEffect } from 'react'
+
+type Status = "loading" | "ok" | "error" | null;
+const BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 function App() {
   const [count, setCount] = useState(0)
+
+  const [status, setStatus] = useState<Status>(null);
+
+  useEffect(() => {
+    const fetchHealth = async () => {
+      setStatus("loading");
+      try {
+        const res = await fetch(`${BASE_URL}/health`);
+        const data = await res.json();
+        console.log(data);
+        if (res.ok) setStatus("ok");
+      } catch (error) {
+        console.error(error);
+        setStatus("error");
+      }
+    }
+
+    fetchHealth();
+  }, []);
 
   return (
     <>
@@ -27,6 +49,9 @@ function App() {
       </div>
       <p className="read-the-docs">
         Click on the Vite and React logos to learn more
+      </p>
+      <p>
+        Health: {status}
       </p>
     </>
   )

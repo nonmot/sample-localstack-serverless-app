@@ -1,4 +1,4 @@
-.PHONY: up down init plan apply destroy fmt
+.PHONY: up down init plan apply destroy fmt build
 
 up:
 	docker compose up -d
@@ -20,3 +20,6 @@ destroy:
 
 fmt:
 	cd terraform && terraform fmt
+
+build:
+	cd frontend && pnpm build

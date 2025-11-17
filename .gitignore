@@ -6,3 +6,5 @@
 crash.log
 
 *.zip
+
+.env

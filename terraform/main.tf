@@ -85,19 +85,23 @@ locals {
 }
 
 resource "aws_s3_object" "object_www" {
+  depends_on   = [aws_s3_bucket.s3_bucket]
   for_each     = fileset(local.dist_dir, "*.html")
   bucket       = local.bucket_name
   key          = basename(each.value)
   source       = "${local.dist_dir}/${each.value}"
+  etag         = filemd5("${local.dist_dir}/${each.value}")
   content_type = "text/html"
   acl          = "public-read"
 }
 
 resource "aws_s3_object" "object_assets" {
+  depends_on   = [aws_s3_bucket.s3_bucket]
   for_each     = local.asset_files
   bucket       = local.bucket_name
   key          = each.key
   source       = "${local.dist_dir}/${each.key}"
+  etag         = filemd5("${local.dist_dir}/${each.key}")
   content_type = each.value
   acl          = "public-read"
 }
@@ -125,8 +129,8 @@ resource "aws_lambda_function" "lambda_function" {
   runtime       = "nodejs20.x"
   role          = aws_iam_role.lambda_exec.arn
 
-  s3_bucket = aws_s3_bucket.lambda_code_bucket.id
-  s3_key    = aws_s3_object.lambda_code.key
+  s3_bucket        = aws_s3_bucket.lambda_code_bucket.id
+  s3_key           = aws_s3_object.lambda_code.key
   source_code_hash = data.archive_file.lambda_zip.output_base64sha256
 }
 
