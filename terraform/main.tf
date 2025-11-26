@@ -26,6 +26,7 @@ provider "aws" {
     lambda     = "http://localhost:4566"
     iam        = "http://localhost:4566"
     apigateway = "http://localhost:4566"
+    dynamodb = "http://localhost:4566"
   }
 }
 
@@ -109,8 +110,8 @@ resource "aws_s3_object" "object_assets" {
 # Lambda
 data "archive_file" "lambda_zip" {
   type        = "zip"
-  source_file = "${local.lambda_dir}/index.js"
-  output_path = "${path.module}/files/index.zip"
+  source_dir = local.lambda_dir
+  output_path = "${path.module}/files/lambda.zip"
 }
 
 resource "aws_s3_bucket" "lambda_code_bucket" {
@@ -119,15 +120,26 @@ resource "aws_s3_bucket" "lambda_code_bucket" {
 
 resource "aws_s3_object" "lambda_code" {
   bucket = aws_s3_bucket.lambda_code_bucket.bucket
-  key    = "index.zip"
+  key    = "lambda.zip"
   source = data.archive_file.lambda_zip.output_path
 }
 
-resource "aws_lambda_function" "lambda_function" {
-  function_name = "handler"
-  handler       = "index.handler"
+resource "aws_lambda_function" "lambda_function_health" {
+  function_name = "health_handler"
+  handler       = "index.health_handler"
   runtime       = "nodejs20.x"
   role          = aws_iam_role.lambda_exec.arn
+
+  s3_bucket        = aws_s3_bucket.lambda_code_bucket.id
+  s3_key           = aws_s3_object.lambda_code.key
+  source_code_hash = data.archive_file.lambda_zip.output_base64sha256
+}
+
+resource "aws_lambda_function" "lambda_function_all_threads" {
+  function_name = "all_threads_handler"
+  handler = "index.all_threads_handler"
+  runtime = "nodejs20.x"
+  role = aws_iam_role.lambda_exec.arn
 
   s3_bucket        = aws_s3_bucket.lambda_code_bucket.id
   s3_key           = aws_s3_object.lambda_code.key
@@ -168,8 +180,18 @@ resource "aws_api_gateway_rest_api" "api" {
           x-amazon-apigateway-integration = {
             httpMethod           = "POST"
             payloadFormatVersion = "1.0"
-            type                 = "AWS_PROXY"
-            uri                  = aws_lambda_function.lambda_function.invoke_arn
+            type                 = "aws_proxy"
+            uri                  = aws_lambda_function.lambda_function_health.invoke_arn
+          }
+        }
+      },
+      "/threads/all" = {
+        get = {
+          x-amazon-apigateway-integration = {
+            httpMethod           = "POST"
+            payloadFormatVersion = "1.0"
+            type                 = "aws_proxy"
+            uri                  = aws_lambda_function.lambda_function_all_threads.invoke_arn
           }
         }
       }
@@ -195,10 +217,89 @@ resource "aws_api_gateway_stage" "dev_stage" {
   stage_name    = "dev"
 }
 
-resource "aws_lambda_permission" "api_gw" {
+resource "aws_lambda_permission" "api_gw_health" {
   statement_id  = "AllowAPIGatewayInvoke"
   action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.lambda_function.function_name
+  function_name = aws_lambda_function.lambda_function_health.function_name
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_api_gateway_rest_api.api.execution_arn}/*/*"
+}
+
+resource "aws_lambda_permission" "api_gw_all_threads" {
+  statement_id  = "AllowAPIGatewayInvoke"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.lambda_function_all_threads.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.api.execution_arn}/*/*"
+}
+
+# DynamoDB
+resource "aws_dynamodb_table" "dynamodb_table" {
+  name = "Posts"
+  billing_mode = "PROVISIONED"
+  read_capacity = 20
+  write_capacity = 20
+  hash_key = "id"
+
+  attribute {
+    name = "id"
+    type = "N"
+  }
+
+  # attribute {
+  #   name = "title"
+  #   type = "S"
+  # }
+  #
+  # attribute {
+  #   name = "body"
+  #   type = "S"
+  # }
+  #
+  # attribute {
+  #   name = "authorName"
+  #   type = "S"
+  # }
+
+  tags = {
+    Name = "dynamodb-table"
+    Environment = "dev"
+  }
+}
+
+locals {
+  list = [
+    {
+      id = { N = "1" },
+      title = { S = "post1" },
+      body = { S = "post1" },
+      authorName = { S = "user1" },
+    }
+  ]
+}
+
+resource "aws_dynamodb_table_item" "items" {
+  for_each = { for i in local.list : "${i.id.N}#{i.title}" => i }
+  table_name = aws_dynamodb_table.dynamodb_table.name
+  hash_key = aws_dynamodb_table.dynamodb_table.hash_key
+  item = jsonencode(each.value)
+}
+
+resource "aws_iam_role_policy" "lambda_dynamodb" {
+  name = "lambda_dynamodb"
+  role = aws_iam_role.lambda_exec.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "dynamodb:Scan"
+        ]
+        Resource = [
+          aws_dynamodb_table.dynamodb_table.arn
+        ]
+      }
+    ]
+  })
 }

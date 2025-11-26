@@ -8,3 +8,5 @@ crash.log
 *.zip
 
 .env
+
+node_modules/

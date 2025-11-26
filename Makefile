@@ -1,10 +1,10 @@
 .PHONY: up down init plan apply destroy fmt build
 
 up:
-	docker compose up -d
+	docker-compose up -d
 
 down:
-	docker compose down --remove-orphans
+	docker-compose down --remove-orphans
 
 init:
 	cd terraform && terraform init
