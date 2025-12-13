@@ -7,9 +7,17 @@ export const Home = () => {
 
   useEffect(() => {
     const fetchThreads = async () => {
-      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/threads/all`);
-      const data = await res.json();
-      setThreads(data.items)
+      try {
+        const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/threads/all`);
+        if (!res.ok) {
+          console.error(`Failed to fetch threads: ${res.status} ${res.statusText}`);
+          return;
+        }
+        const data = await res.json();
+        setThreads(data.items);
+      } catch (error) {
+        console.error("An error occurred while fetching threads: ", error);
+      }
     };
 
     fetchThreads();

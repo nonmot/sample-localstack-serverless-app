@@ -26,7 +26,7 @@ provider "aws" {
     lambda     = "http://localhost:4566"
     iam        = "http://localhost:4566"
     apigateway = "http://localhost:4566"
-    dynamodb = "http://localhost:4566"
+    dynamodb   = "http://localhost:4566"
   }
 }
 
@@ -110,7 +110,7 @@ resource "aws_s3_object" "object_assets" {
 # Lambda
 data "archive_file" "lambda_zip" {
   type        = "zip"
-  source_dir = local.lambda_dir
+  source_dir  = local.lambda_dir
   output_path = "${path.module}/files/lambda.zip"
 }
 
@@ -137,9 +137,9 @@ resource "aws_lambda_function" "lambda_function_health" {
 
 resource "aws_lambda_function" "lambda_function_all_threads" {
   function_name = "all_threads_handler"
-  handler = "index.all_threads_handler"
-  runtime = "nodejs20.x"
-  role = aws_iam_role.lambda_exec.arn
+  handler       = "index.all_threads_handler"
+  runtime       = "nodejs20.x"
+  role          = aws_iam_role.lambda_exec.arn
 
   s3_bucket        = aws_s3_bucket.lambda_code_bucket.id
   s3_key           = aws_s3_object.lambda_code.key
@@ -235,34 +235,19 @@ resource "aws_lambda_permission" "api_gw_all_threads" {
 
 # DynamoDB
 resource "aws_dynamodb_table" "dynamodb_table" {
-  name = "Threads"
-  billing_mode = "PROVISIONED"
-  read_capacity = 20
+  name           = "Threads"
+  billing_mode   = "PROVISIONED"
+  read_capacity  = 20
   write_capacity = 20
-  hash_key = "id"
+  hash_key       = "id"
 
   attribute {
     name = "id"
     type = "N"
   }
 
-  # attribute {
-  #   name = "title"
-  #   type = "S"
-  # }
-  #
-  # attribute {
-  #   name = "body"
-  #   type = "S"
-  # }
-  #
-  # attribute {
-  #   name = "authorName"
-  #   type = "S"
-  # }
-
   tags = {
-    Name = "dynamodb-table"
+    Name        = "dynamodb-table"
     Environment = "dev"
   }
 }
@@ -270,31 +255,31 @@ resource "aws_dynamodb_table" "dynamodb_table" {
 locals {
   list = [
     {
-      id = { N = "1" },
-      title = { S = "はじめての掲示板投稿" },
-      body = { S = "これはテスト用の投稿です。" },
+      id         = { N = "1" },
+      title      = { S = "はじめての掲示板投稿" },
+      body       = { S = "これはテスト用の投稿です。" },
       authorName = { S = "名無し" },
     },
     {
-      id = { N = "2" },
-      title = { S = "DynamoDB完全に理解したったwwwwwwww" },
-      body = { S = "嘘です。ナニモワカリマセン" },
+      id         = { N = "2" },
+      title      = { S = "DynamoDB完全に理解したったwwwwwwww" },
+      body       = { S = "嘘です。ナニモワカリマセン" },
       authorName = { S = "名無し" },
     },
     {
-      id = { N = "3" },
-      title = { S = "DynamoDB設計について" },
-      body = { S = "シングルテーブル設計は慣れると便利です。" },
+      id         = { N = "3" },
+      title      = { S = "DynamoDB設計について" },
+      body       = { S = "シングルテーブル設計は慣れると便利です。" },
       authorName = { S = "匿名希望" },
     },
   ]
 }
 
 resource "aws_dynamodb_table_item" "items" {
-  for_each = { for i in local.list : "${i.id.N}#{i.title}" => i }
+  for_each   = { for i in local.list : i.id.N => i }
   table_name = aws_dynamodb_table.dynamodb_table.name
-  hash_key = aws_dynamodb_table.dynamodb_table.hash_key
-  item = jsonencode(each.value)
+  hash_key   = aws_dynamodb_table.dynamodb_table.hash_key
+  item       = jsonencode(each.value)
 }
 
 resource "aws_iam_role_policy" "lambda_dynamodb" {
