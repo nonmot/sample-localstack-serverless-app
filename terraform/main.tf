@@ -235,7 +235,7 @@ resource "aws_lambda_permission" "api_gw_all_threads" {
 
 # DynamoDB
 resource "aws_dynamodb_table" "dynamodb_table" {
-  name = "Posts"
+  name = "Threads"
   billing_mode = "PROVISIONED"
   read_capacity = 20
   write_capacity = 20
@@ -271,10 +271,22 @@ locals {
   list = [
     {
       id = { N = "1" },
-      title = { S = "post1" },
-      body = { S = "post1" },
-      authorName = { S = "user1" },
-    }
+      title = { S = "はじめての掲示板投稿" },
+      body = { S = "これはテスト用の投稿です。" },
+      authorName = { S = "名無し" },
+    },
+    {
+      id = { N = "2" },
+      title = { S = "DynamoDB完全に理解したったwwwwwwww" },
+      body = { S = "嘘です。ナニモワカリマセン" },
+      authorName = { S = "名無し" },
+    },
+    {
+      id = { N = "3" },
+      title = { S = "DynamoDB設計について" },
+      body = { S = "シングルテーブル設計は慣れると便利です。" },
+      authorName = { S = "匿名希望" },
+    },
   ]
 }
 

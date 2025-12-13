@@ -20,9 +20,9 @@ exports.health_handler = async (event) => {
 exports.all_threads_handler = async (_event) => {
 
   const command = new ScanCommand({
-    ProjectionExpression: "#id",
+    ProjectionExpression: "#id, title, body, authorName",
     ExpressionAttributeNames: { "#id": "id" },
-    TableName: "Posts",
+    TableName: "Threads",
   });
 
   try {

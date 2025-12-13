@@ -1,14 +1,14 @@
 import { useState, useEffect } from "react"
+import { type Thread } from "../types/thread";
 
 export const Home = () => {
 
-  const [threads, setThreads] = useState([]);
+  const [threads, setThreads] = useState<Thread[]>([]);
 
   useEffect(() => {
     const fetchThreads = async () => {
       const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/threads/all`);
       const data = await res.json();
-      console.log(data.items);
       setThreads(data.items)
     };
 
@@ -21,7 +21,10 @@ export const Home = () => {
       <div>
         {threads.map((thread) => (
           <div key={thread.id}>
-            <h2>{thread.id}</h2>
+            <h2>{thread.title}</h2>
+            <span>投稿者: {thread.authorName}</span>
+            <p>{thread.body}</p>
+            <hr />
           </div>
         ))}
       </div>
