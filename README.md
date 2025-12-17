@@ -1,5 +1,6 @@
 # sample-localstack-serverless-app
 LocalStack 上に S3 website + API Gateway + Lambda + DynamoDB を立て、React (Vite) フロントを配信するサンプルです。
+![architecture](./docs/architecture.svg)
 
 ## 前提条件
 - Docker / Docker Compose
